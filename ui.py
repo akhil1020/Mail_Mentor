@@ -14,6 +14,7 @@ from app import (
     move_to_trash,
 )
 import os
+import datetime
 
 def check_internet_connection():
     try:
@@ -22,17 +23,36 @@ def check_internet_connection():
     except OSError:
         return False
 
-def refresh_emails():
+def refresh_emails(label=None):
     stored_emails = load_emails_from_local_storage() or []
-    new_messages = get_new_emails(st.session_state.service, stored_emails)
-    if new_messages:
+    # If label is "SENT", fetch sent emails from Gmail
+    if label == "SENT":
+        # Only fetch new sent emails
+        from app import get_gmail_service
+        service = st.session_state.service
+        sent_msgs = service.users().messages().list(userId='me', labelIds=['SENT'], maxResults=50).execute().get('messages', [])
+        sent_ids = {email['id'] for email in stored_emails if 'SENT' in email.get('labels', [])}
+        new_sent = [msg for msg in sent_msgs if msg['id'] not in sent_ids]
         parsed_emails = []
-        for msg in new_messages:
-            email = parse_email(st.session_state.service, msg['id'])
+        for msg in new_sent:
+            email = parse_email(service, msg['id'])
+            if 'SENT' not in email.get('labels', []):
+                email['labels'].append('SENT')
             parsed_emails.append(email)
         stored_emails.extend(parsed_emails)
         save_emails_to_local_storage(stored_emails)
-    return stored_emails
+        return stored_emails
+    else:
+        # Default: fetch inbox and others as before
+        new_messages = get_new_emails(st.session_state.service, stored_emails)
+        if new_messages:
+            parsed_emails = []
+            for msg in new_messages:
+                email = parse_email(st.session_state.service, msg['id'])
+                parsed_emails.append(email)
+            stored_emails.extend(parsed_emails)
+            save_emails_to_local_storage(stored_emails)
+        return stored_emails
 
 def render_sidebar():
     with st.sidebar:
@@ -101,24 +121,24 @@ def render_email_list(emails):
                     delete_email(st.session_state.service, email['id'])
                     emails.remove(email)
                     save_emails_to_local_storage(emails)
-                    st.experimental_rerun()
+                    st.rerun()
                 if cols[1].button("Move to Trash", key=f"trash_{idx}"):
                     move_to_trash(st.session_state.service, email['id'])
                     email['labels'].append('TRASH')
                     save_emails_to_local_storage(emails)
-                    st.experimental_rerun()
+                    st.rerun()
                 if cols[2].button("Mark Important", key=f"imp_{idx}"):
                     if 'IMPORTANT' not in email['labels']:
                         modify_labels(st.session_state.service, email['id'], add_labels=['IMPORTANT'])
                         email['labels'].append('IMPORTANT')
                         save_emails_to_local_storage(emails)
-                        st.experimental_rerun()
+                        st.rerun()
                 if cols[3].button("Archive", key=f"arc_{idx}"):
                     if 'ARCHIVE' not in email['labels']:
                         modify_labels(st.session_state.service, email['id'], add_labels=['ARCHIVE'])
                         email['labels'].append('ARCHIVE')
                         save_emails_to_local_storage(emails)
-                        st.experimental_rerun()
+                        st.rerun()
                 if cols[4].button("Reply", key=f"rep_{idx}"):
                     st.session_state.current_view = "compose"
                     st.session_state.reply_to = email
@@ -133,7 +153,24 @@ def render_compose():
         # Pass attachment file object if present
         send_email(st.session_state.service, to, subject, body, attachment=attachment if attachment else None)
         st.success("Email sent!")
-        st.session_state.current_view = "inbox"
+        # Add the sent email to local cache immediately
+        sent_email = {
+            'id': f"local-{datetime.datetime.now().timestamp()}",
+            'subject': subject,
+            'sender': st.session_state.service.users().getProfile(userId='me').execute()['emailAddress'],
+            'to': to,
+            'date': str(datetime.datetime.now()),
+            'snippet': body[:100],
+            'body': body,
+            'attachments': [],
+            'labels': ['SENT']
+        }
+        emails = load_emails_from_local_storage() or []
+        emails.append(sent_email)
+        save_emails_to_local_storage(emails)
+        st.session_state.current_view = "sent"
+        st.session_state.filter_label = "SENT"
+        st.rerun()
     if st.button("Save as Draft"):
         save_draft(st.session_state.service, to, subject, body)
         st.success("Draft saved!")
@@ -156,9 +193,10 @@ def render_ui():
             st.session_state.service = get_gmail_service()
 
     # Load or refresh emails
+    label = st.session_state.get('filter_label')
     if st.session_state.refresh or not os.path.exists('email_cache.json'):
         with st.spinner("Fetching emails from Gmail..."):
-            emails = refresh_emails()
+            emails = refresh_emails(label=label)
             st.session_state.refresh = False
     else:
         emails = load_emails_from_local_storage() or []
@@ -167,6 +205,9 @@ def render_ui():
     if st.session_state.current_view == "compose":
         render_compose()
     else:
+        # Always refresh sent emails when viewing "Sent"
+        if st.session_state.current_view == "sent":
+            emails = refresh_emails(label="SENT")
         render_email_list(emails)
 
 if __name__ == "__main__":
