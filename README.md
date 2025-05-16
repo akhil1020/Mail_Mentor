@@ -1,7 +1,7 @@
-📬 Mail Mentor – Smart Gmail Semantic Search & Insights
+# 📬 Mail Mentor – Smart Gmail Semantic Search & Insights
 A full-stack application that ingests your Gmail inbox, stores the data securely, and allows semantic search and email intelligence through a user-friendly Streamlit UI.
 
-🚀 Features
+## 🚀 Features
 🔒 OAuth2-based Gmail API integration
 
 💾 Stores email metadata, content & attachments
@@ -9,9 +9,10 @@ A full-stack application that ingests your Gmail inbox, stores the data securely
 📊 Interactive UI with Streamlit
 
 🧹 Email caching for fast reloads
+<br></br>
 
 
-⚙️ Prerequisites
+## ⚙️ Prerequisites
 Before running the project, ensure you have:
 
 Python 3.10+
@@ -24,29 +25,33 @@ PostgreSQL installed and a database created
 
 virtualenv (optional, but recommended)
 
+<br></br>
 
-🔧 Setup Instructions
-1. Clone the Repository
+
+## 🔧 Setup Instructions
+<br></br>
+
+### 1. Clone the Repository
    
-bash
+bash <br></br>
 git clone https://github.com/akhil1020/Mail_Mentor.git
 cd Mail_Mentor
 
-2. Create a Virtual Environment (optional but recommended)
+### 2. Create a Virtual Environment (optional but recommended)
 
-bash
+bash <br></br>
 python -m venv venv
 Windows: venv\Scripts\activate
 
 ex; (venv) PS D:\Mail-Mentor> # you gonna see after run this command.    
 
-3. Install Required Packages
+### 3. Install Required Packages
 
-bash
+bash <br></br>
 pip install -r requirements.txt
 
 
-4. Add Your Google API Credentials
+### 4. Add Your Google API Credentials
 
 --> open google cloud console using your gmail id
 --> create project 
@@ -54,8 +59,8 @@ pip install -r requirements.txt
 ==> At the end you gonna to create desctop app (xyz........json) rename this file as credentials.json and store into root directory of your project.
 
 
-5 Launch the Streamlit UI
-bash
+### 5 Launch the Streamlit UI
+bash <br></br>
 streamlit run ui.py 
 
 ex; (venv) PS D:\Mail-Mentor> streamlit run ui.py      "like this"
@@ -77,13 +82,13 @@ ex; (venv) PS D:\Mail-Mentor> streamlit run ui.py      "like this"
 
 
 
-🔐 Security Notes
+## 🔐 Security Notes
 .env, token.json, and credentials.json are excluded via .gitignore
 
 Be sure to revoke your Gmail token from your Google account if sharing
 
 
-🧹 TODO / Coming Soon
+## 🧹 TODO / Coming Soon
 
 Attachment preview
 Email clustering
@@ -91,11 +96,11 @@ Daily email summary
 Full-text search fallback
 Docker container support
 
-🤝 Contributing
+## 🤝 Contributing
 Feel free to open issues or submit pull requests!
 
 
-🧠 Built with ❤️ by Akhil
+## 🧠 Built with ❤️ by Akhil
 
 
 
