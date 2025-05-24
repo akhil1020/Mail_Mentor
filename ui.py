@@ -16,6 +16,10 @@ from app import (
 import os
 import datetime
 
+from semantic_search import SemanticSearchEngine
+semantic_engine = SemanticSearchEngine()
+#--------*****-----
+
 def check_internet_connection():
     try:
         socket.create_connection(("8.8.8.8", 53), timeout=3)
@@ -27,8 +31,6 @@ def refresh_emails(label=None):
     stored_emails = load_emails_from_local_storage() or []
     # If label is "SENT", fetch sent emails from Gmail
     if label == "SENT":
-        # Only fetch new sent emails
-        from app import get_gmail_service
         service = st.session_state.service
         sent_msgs = service.users().messages().list(userId='me', labelIds=['SENT'], maxResults=50).execute().get('messages', [])
         sent_ids = {email['id'] for email in stored_emails if 'SENT' in email.get('labels', [])}
@@ -79,15 +81,12 @@ def render_sidebar():
             st.session_state.refresh = True
 
 def render_email_list(emails):
-    search_query = st.text_input("🔍 Smart Search...", key="text_search")
+    search_query = st.text_input("🔍 Smart Semantic Search...", key="text_search")
     if search_query:
-        filtered_emails = [
-            email for email in emails
-            if search_query.lower() in email.get('subject', '').lower()
-            or search_query.lower() in email.get('body', '').lower()
-            or search_query.lower() in email.get('sender', '').lower()
-            or any(search_query.lower() in label.lower() for label in email.get('labels', []))
-        ]
+        filtered_emails = semantic_engine.smart_search(search_query, emails, top_k=20, min_score=0.5)
+        if not filtered_emails:
+            st.info("No emails found matching your query.")
+            return
         st.write(f"🔍 Found {len(filtered_emails)} matching emails")
     else:
         label = st.session_state.get("filter_label")
@@ -110,36 +109,39 @@ def render_email_list(emails):
                 st.markdown(f"**Labels:** {', '.join(email.get('labels', []))}")
                 st.write(email.get('body', ''))
                 # Attachments
-                for att in email.get('attachments', []):
-                    if st.button(f"Download {att['filename']}", key=f"att_{idx}_{att['filename']}"):
+                for i, att in enumerate(email.get('attachments', [])):
+                    if st.button(
+                        f"Download {att['filename']}",
+                        key=f"att_{email['id']}_{idx}_{i}"
+                    ):
                         data = download_attachment(st.session_state.service, email['id'], att['attachment_id'])
-                        st.download_button("Download", data, file_name=att['filename'])
+                        st.download_button("Download", data, file_name=att['filename'], key=f"dl_{email['id']}_{idx}_{i}")
                 # Actions
                 cols = st.columns(5)
-                if cols[0].button("Delete", key=f"del_{idx}"):
+                if cols[0].button("Delete", key=f"del_{email['id']}"):
                     # Delete from Gmail and local cache
                     delete_email(st.session_state.service, email['id'])
                     emails.remove(email)
                     save_emails_to_local_storage(emails)
                     st.rerun()
-                if cols[1].button("Move to Trash", key=f"trash_{idx}"):
+                if cols[1].button("Move to Trash", key=f"trash_{email['id']}"):
                     move_to_trash(st.session_state.service, email['id'])
                     email['labels'].append('TRASH')
                     save_emails_to_local_storage(emails)
                     st.rerun()
-                if cols[2].button("Mark Important", key=f"imp_{idx}"):
+                if cols[2].button("Mark Important", key=f"imp_{email['id']}"):
                     if 'IMPORTANT' not in email['labels']:
                         modify_labels(st.session_state.service, email['id'], add_labels=['IMPORTANT'])
                         email['labels'].append('IMPORTANT')
                         save_emails_to_local_storage(emails)
                         st.rerun()
-                if cols[3].button("Archive", key=f"arc_{idx}"):
+                if cols[3].button("Archive", key=f"arc_{email['id']}"):
                     if 'ARCHIVE' not in email['labels']:
                         modify_labels(st.session_state.service, email['id'], add_labels=['ARCHIVE'])
                         email['labels'].append('ARCHIVE')
                         save_emails_to_local_storage(emails)
                         st.rerun()
-                if cols[4].button("Reply", key=f"rep_{idx}"):
+                if cols[4].button("Reply", key=f"rep_{email['id']}"):
                     st.session_state.current_view = "compose"
                     st.session_state.reply_to = email
 
@@ -201,13 +203,17 @@ def render_ui():
     else:
         emails = load_emails_from_local_storage() or []
 
+    # Always refresh sent emails when viewing "Sent"
+    if st.session_state.current_view == "sent":
+        emails = refresh_emails(label="SENT")
+
+    emails = semantic_engine.compute_and_save_embeddings(emails)
+    save_emails_to_local_storage(emails)
+
     # Main view
     if st.session_state.current_view == "compose":
         render_compose()
     else:
-        # Always refresh sent emails when viewing "Sent"
-        if st.session_state.current_view == "sent":
-            emails = refresh_emails(label="SENT")
         render_email_list(emails)
 
 if __name__ == "__main__":

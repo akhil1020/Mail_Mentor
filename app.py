@@ -1,3 +1,5 @@
+
+
 import streamlit as st
 import base64
 import io
@@ -9,15 +11,8 @@ import datetime
 import time
 
 #secrets
-from dotenv import load_dotenv
 import os
-
-load_dotenv()
-
-client_id = os.getenv("CLIENT_ID")
-client_secret = os.getenv("CLIENT_SECRET")
-refresh_token = os.getenv("REFRESH_TOKEN")
-access_token = os.getenv("ACCESS_TOKEN")
+from dotenv import load_dotenv
 
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
@@ -36,6 +31,12 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 
+load_dotenv()
+
+client_id = os.getenv("CLIENT_ID")
+client_secret = os.getenv("CLIENT_SECRET")
+refresh_token = os.getenv("REFRESH_TOKEN")
+access_token = os.getenv("ACCESS_TOKEN")
 SCOPES = ['https://mail.google.com/']
 
 def retry_on_ssl_error(max_retries=3, delay=1):
